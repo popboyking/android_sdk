@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.StrictMode;
 import android.util.Log;
 
 import com.adjust.sdk.Adjust;
@@ -27,9 +28,19 @@ import com.adjust.sdk.AdjustSessionSuccess;
 public class GlobalApplication extends Application {
     @Override
     public void onCreate() {
+        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+                .detectAll()
+                .penaltyLog()
+                .penaltyDialog()
+                .build());
+        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
+                .detectAll()
+                .penaltyLog()
+                .build());
         super.onCreate();
         // configure Adjust
-        String appToken = "rb4g27fje5ej";
+        String appToken = "qwerty123456";
+
         String environment = AdjustConfig.ENVIRONMENT_SANDBOX;
         AdjustConfig config = new AdjustConfig(this, appToken, environment);
 

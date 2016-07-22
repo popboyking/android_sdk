@@ -33,6 +33,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
@@ -143,6 +145,12 @@ public class Util {
         Closeable closable = null;
         T object = null;
         try {
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                getLogger().debug("readObject in the background");
+            } else {
+                getLogger().debug("readObject in the foreground");
+            }
+
             FileInputStream inputStream = context.openFileInput(filename);
             closable = inputStream;
 
@@ -286,15 +294,24 @@ public class Util {
     public static AdjustFactory.URLGetConnection createGETHttpsURLConnection(String urlString, String clientSdk)
             throws IOException
     {
-        URL url = new URL(urlString);
-        AdjustFactory.URLGetConnection urlGetConnection = AdjustFactory.getHttpsURLGetConnection(url);
+        HttpsURLConnection connection = null;
+        try {
+            URL url = new URL(urlString);
+            AdjustFactory.URLGetConnection urlGetConnection = AdjustFactory.getHttpsURLGetConnection(url);
 
-        HttpsURLConnection connection = urlGetConnection.httpsURLConnection;
-        setDefaultHttpsUrlConnectionProperties(connection, clientSdk);
+            connection = urlGetConnection.httpsURLConnection;
+            setDefaultHttpsUrlConnectionProperties(connection, clientSdk);
 
-        connection.setRequestMethod("GET");
+            connection.setRequestMethod("GET");
 
-        return urlGetConnection;
+            return urlGetConnection;
+        } catch (IOException e) {
+            throw e;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     public static HttpsURLConnection createPOSTHttpsURLConnection(String urlString, String clientSdk,
@@ -302,22 +319,37 @@ public class Util {
                                                                   int queueSize)
             throws IOException
     {
-        URL url = new URL(urlString);
-        HttpsURLConnection connection = AdjustFactory.getHttpsURLConnection(url);
+        DataOutputStream wr = null;
+        HttpsURLConnection connection = null;
+        try {
+            URL url = new URL(urlString);
+            connection = AdjustFactory.getHttpsURLConnection(url);
 
-        setDefaultHttpsUrlConnectionProperties(connection, clientSdk);
-        connection.setRequestMethod("POST");
+            setDefaultHttpsUrlConnectionProperties(connection, clientSdk);
+            connection.setRequestMethod("POST");
 
-        connection.setUseCaches(false);
-        connection.setDoInput(true);
-        connection.setDoOutput(true);
+            connection.setUseCaches(false);
+            connection.setDoInput(true);
+            connection.setDoOutput(true);
 
-        DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
-        wr.writeBytes(getPostDataString(parameters, queueSize));
-        wr.flush();
-        wr.close();
+            wr = new DataOutputStream(connection.getOutputStream());
+            wr.writeBytes(getPostDataString(parameters, queueSize));
 
-        return connection;
+            return connection;
+        } catch (IOException e) {
+            throw e;
+        } finally {
+            try {
+                if (wr != null) {
+                    wr.flush();
+                    wr.close();
+                }
+            }catch (Exception e) { }
+
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     private static String getPostDataString(Map<String, String> body, int queueSize) throws UnsupportedEncodingException {
